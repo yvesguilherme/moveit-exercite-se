@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useState } from 'react';
+import { createContext, ReactNode, useEffect, useState } from 'react';
 
 import challenges from '../../challenges.json';
 
@@ -17,6 +17,7 @@ interface ChallengesContextData {
   startNewChallenge: () => void;
   activeChallenge: Challenge;
   resetChallenge: () => void;
+  completeChallenge: () => void;
 }
 
 interface ChallengesProviderProps {
@@ -37,9 +38,14 @@ export function ChallengesProvider({ children }: ChallengesProviderProps) {
    * Cálculo baseado nos jogos de RPG.
    * Existem dois tipos de cálculo, com Log. e com Raíz Quad.
    * 
-   * O '15' neste cálculo, é o fator da dificuldade para se obter XP.
+   * O '4' neste cálculo, é o fator da dificuldade para se obter XP.
    */
-  const experienceToNextLevel = Math.pow((level + 1) * 15, 2);
+  const experienceToNextLevel = Math.pow((level + 1) * 4, 2);
+
+  // Executado apenas uma única vez quando o componente é exibido.
+  useEffect(() => {
+    Notification.requestPermission();
+  }, []);
 
   function levelUp() {
     setLevel(level + 1);
@@ -51,10 +57,37 @@ export function ChallengesProvider({ children }: ChallengesProviderProps) {
     const challenge = challenges[randomChallengeIndex];
 
     setActiveChallenge(challenge);
+
+    new Audio('/notification.mp3').play();
+
+    if (Notification.permission === 'granted') {
+      new Notification('Novo desafio 🥳', {
+        body: `Valendo ${challenge.amount}xp!`
+      });
+    }
   }
 
   function resetChallenge() {
     setActiveChallenge(null);
+  }
+
+  function completeChallenge() {
+    if (!completeChallenge) {
+      return;
+    }
+
+    const { amount } = activeChallenge;
+
+    let finalExperience = currentExperience + amount;
+
+    if (finalExperience >= experienceToNextLevel) {
+      finalExperience = finalExperience - experienceToNextLevel;
+      levelUp();
+    }
+
+    setCurrentExperience(finalExperience);
+    setActiveChallenge(null);
+    setChallengesCompleted(challengesCompleted + 1);
   }
 
   return (
@@ -67,7 +100,8 @@ export function ChallengesProvider({ children }: ChallengesProviderProps) {
         levelUp,
         startNewChallenge,
         activeChallenge,
-        resetChallenge
+        resetChallenge,
+        completeChallenge
       }}>
       {children}
     </ChallengesContext.Provider>
